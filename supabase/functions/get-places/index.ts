@@ -5,14 +5,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Mood to Geoapify category mapping
+// Mood to Geoapify category mapping (using valid Geoapify categories)
 const moodToCategories: Record<string, string[]> = {
-  'work': ['catering.cafe', 'office.coworking', 'service.library'],
-  'date-night': ['catering.restaurant', 'catering.bar', 'entertainment.nightclub'],
-  'quick-bite': ['catering.fast_food', 'catering.restaurant', 'catering.bakery'],
-  'budget': ['catering.restaurant', 'catering.cafe', 'catering.bakery'],
-  'coffee': ['catering.cafe', 'catering.coffee'],
-  'fancy': ['catering.restaurant.fine_dining', 'catering.restaurant', 'catering.bar'],
+  'work': ['catering.cafe', 'service.library'],
+  'date-night': ['catering.restaurant', 'catering.bar', 'catering.pub'],
+  'quick-bite': ['catering.fast_food', 'catering.restaurant', 'commercial.food_and_drink.bakery'],
+  'budget': ['catering.restaurant', 'catering.cafe', 'catering.fast_food'],
+  'coffee': ['catering.cafe', 'catering.cafe.coffee_shop', 'catering.cafe.coffee'],
+  'fancy': ['catering.restaurant', 'catering.bar'],
 };
 
 serve(async (req) => {
@@ -81,16 +81,16 @@ serve(async (req) => {
       );
       
       return {
-        id: props.place_id || feature.id,
+        id: props.place_id || feature.id || `place-${Math.random().toString(36).substr(2, 9)}`,
         name: props.name || props.address_line1 || 'Unknown Place',
         address: props.formatted || props.address_line2 || '',
         distance: distance,
         distanceText: `${distance.toFixed(1)} mi`,
         rating: props.rating || 0,
         totalRatings: props.user_ratings_total || 0,
-        isOpen: props.opening_hours ? !props.opening_hours.includes('closed') : true,
+        isOpen: true, // Geoapify doesn't always provide opening hours
         priceLevel: getPriceLevel(props.categories, mood),
-        photoUrl: null, // Geoapify doesn't provide photos in basic API
+        photoUrl: null,
         types: props.categories || [],
         location: { lat: coords[1], lng: coords[0] },
         placeId: props.place_id,
