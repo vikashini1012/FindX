@@ -1,7 +1,8 @@
 import { motion } from 'framer-motion';
 import { Place } from '@/types/place';
-import { MapPin, Star, Clock, Navigation } from 'lucide-react';
+import { MapPin, Star, Clock, Navigation, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 
 interface PlaceCardProps {
   place: Place;
@@ -12,6 +13,12 @@ export const PlaceCard = ({ place, index }: PlaceCardProps) => {
   const priceIndicator = place.priceLevel 
     ? '$'.repeat(place.priceLevel) 
     : null;
+
+  const handleGetDirections = () => {
+    const destination = encodeURIComponent(place.address || place.name);
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&destination_place_id=${place.id}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <motion.div
@@ -75,8 +82,8 @@ export const PlaceCard = ({ place, index }: PlaceCardProps) => {
           <span className="text-sm line-clamp-1">{place.address}</span>
         </div>
         
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-border/50">
+        {/* Stats row */}
+        <div className="flex items-center justify-between mb-3">
           {/* Distance */}
           <div className="flex items-center gap-1.5 text-sm">
             <Navigation className="w-4 h-4 text-coral" />
@@ -89,6 +96,17 @@ export const PlaceCard = ({ place, index }: PlaceCardProps) => {
             <span>{place.openingHours || (place.isOpen ? 'Open now' : 'Closed')}</span>
           </div>
         </div>
+        
+        {/* Directions button */}
+        <Button 
+          variant="coral" 
+          size="sm" 
+          className="w-full"
+          onClick={handleGetDirections}
+        >
+          <ExternalLink className="w-4 h-4 mr-2" />
+          Get Directions
+        </Button>
       </div>
     </motion.div>
   );
