@@ -5,13 +5,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Mood to Geoapify category mapping (using valid Geoapify categories)
+// Mood to Geoapify category mapping (using ONLY valid Geoapify categories)
 const moodToCategories: Record<string, string[]> = {
-  'work': ['catering.cafe', 'service.library'],
+  'work': ['catering.cafe', 'catering.cafe.coffee_shop'],
   'date-night': ['catering.restaurant', 'catering.bar', 'catering.pub'],
-  'quick-bite': ['catering.fast_food', 'catering.restaurant', 'commercial.food_and_drink.bakery'],
-  'budget': ['catering.restaurant', 'catering.cafe', 'catering.fast_food'],
-  'coffee': ['catering.cafe', 'catering.cafe.coffee_shop', 'catering.cafe.coffee'],
+  'quick-bite': ['catering.fast_food', 'catering.restaurant'],
+  'budget': ['catering.fast_food', 'catering.cafe'],
+  'coffee': ['catering.cafe', 'catering.cafe.coffee_shop'],
   'fancy': ['catering.restaurant', 'catering.bar'],
 };
 
@@ -88,7 +88,7 @@ serve(async (req) => {
         distanceText: `${distance.toFixed(1)} mi`,
         rating: props.rating || 0,
         totalRatings: props.user_ratings_total || 0,
-        isOpen: true, // Geoapify doesn't always provide opening hours
+        isOpen: true,
         priceLevel: getPriceLevel(props.categories, mood),
         photoUrl: null,
         types: props.categories || [],
@@ -138,7 +138,6 @@ function toRad(deg: number): number {
 function getPriceLevel(categories: string[], mood: string): number {
   if (mood === 'fancy') return 3;
   if (mood === 'budget' || mood === 'quick-bite') return 1;
-  if (categories?.some((c: string) => c.includes('fine_dining'))) return 4;
   if (categories?.some((c: string) => c.includes('fast_food'))) return 1;
   return 2;
 }
