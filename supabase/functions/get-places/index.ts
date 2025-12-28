@@ -68,9 +68,26 @@ serve(async (req) => {
     }
     
     // Transform Geoapify response to our format
-    const places = (placesData.features || []).map((feature: any) => {
-      const props = feature.properties;
-      const coords = feature.geometry?.coordinates || [0, 0];
+    type GeoFeature = {
+      properties?: {
+        place_id?: string;
+        name?: string;
+        address_line1?: string;
+        formatted?: string;
+        address_line2?: string;
+        rating?: number;
+        user_ratings_total?: number;
+        categories?: string[];
+      };
+      geometry?: { coordinates?: number[] };
+      id?: string;
+    };
+
+    const features = Array.isArray(placesData.features) ? (placesData.features as GeoFeature[]) : [];
+
+    const places = features.map((feature) => {
+      const props = (feature.properties ?? {}) as NonNullable<GeoFeature['properties']>;
+      const coords = feature.geometry?.coordinates ?? [0, 0];
       
       // Calculate distance
       const distance = calculateDistance(
