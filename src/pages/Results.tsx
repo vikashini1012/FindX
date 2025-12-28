@@ -7,14 +7,15 @@ import { FilterBar } from '@/components/FilterBar';
 import { LoadingState } from '@/components/LoadingState';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorState } from '@/components/ErrorState';
+import { PlacesMap } from '@/components/PlacesMap';
 import { getMoodById } from '@/lib/moods';
 import { usePlaces } from '@/hooks/usePlaces';
 import { Mood, FilterOptions, Location } from '@/types/place';
 
 const Results = () => {
   const { mood } = useParams<{ mood: string }>();
-  const location = useLocation();
-  const userLocation = location.state?.location as Location | undefined;
+  const routeLocation = useLocation();
+  const userLocation = routeLocation.state?.location as Location | undefined;
   
   const moodConfig = getMoodById(mood || '');
   const { places, loading, error, fetchPlaces, filterAndSortPlaces } = usePlaces();
@@ -23,6 +24,8 @@ const Results = () => {
     openNow: false,
     sortBy: 'distance',
   });
+  
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | undefined>();
 
   useEffect(() => {
     if (mood) {
@@ -78,6 +81,18 @@ const Results = () => {
           <ErrorState message={error} onRetry={handleRetry} />
         ) : (
           <>
+            {/* Map */}
+            {filteredPlaces.length > 0 && (
+              <div className="mb-6">
+                <PlacesMap 
+                  places={filteredPlaces}
+                  userLocation={userLocation || null}
+                  selectedPlaceId={selectedPlaceId}
+                  onPlaceSelect={setSelectedPlaceId}
+                />
+              </div>
+            )}
+            
             {/* Filter Bar */}
             <FilterBar 
               filters={filters}
@@ -96,20 +111,6 @@ const Results = () => {
               </div>
             )}
           </>
-        )}
-
-        {/* Demo mode notice */}
-        {!userLocation && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="mt-8 p-4 bg-secondary rounded-xl text-center"
-          >
-            <p className="text-sm text-muted-foreground">
-              📍 Running in demo mode with sample data. Enable location for real recommendations.
-            </p>
-          </motion.div>
         )}
       </main>
     </div>
