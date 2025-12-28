@@ -1,6 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Place, Mood, Location, FilterOptions, SortOption } from '@/types/place';
-import { getMockPlaces } from '@/lib/mock-places';
+import { Place, Mood, Location, FilterOptions } from '@/types/place';
 import { supabase } from '@/integrations/supabase/client';
 
 interface UsePlacesState {
@@ -20,38 +19,57 @@ export const usePlaces = () => {
     setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      // Try to fetch from edge function if location is available
-      if (location) {
-        const { data, error } = await supabase.functions.invoke('get-places', {
-          body: { mood, location },
+      if (!location) {
+        setState({
+          places: [],
+          loading: false,
+          error: 'Location is required to find nearby places. Please enable location access.',
         });
-
-        if (!error && data?.places) {
-          setState({
-            places: data.places,
-            loading: false,
-            error: null,
-          });
-          return;
-        }
+        return;
       }
 
-      // Fall back to mock data
-      await new Promise(resolve => setTimeout(resolve, 800)); // Simulate network delay
-      const mockPlaces = getMockPlaces(mood);
-      setState({
-        places: mockPlaces,
-        loading: false,
-        error: null,
+      const { data, error } = await supabase.functions.invoke('get-places', {
+        body: { mood, location },
       });
+
+      if (error) {
+        console.error('Edge function error:', error);
+        setState({
+          places: [],
+          loading: false,
+          error: 'Failed to fetch places. Please try again.',
+        });
+        return;
+      }
+
+      if (data?.useMock) {
+        setState({
+          places: [],
+          loading: false,
+          error: data.message || 'API key not configured properly.',
+        });
+        return;
+      }
+
+      if (data?.places && data.places.length > 0) {
+        setState({
+          places: data.places,
+          loading: false,
+          error: null,
+        });
+      } else {
+        setState({
+          places: [],
+          loading: false,
+          error: 'No places found nearby. Try a different mood or location.',
+        });
+      }
     } catch (err) {
       console.error('Error fetching places:', err);
-      // Fall back to mock data on error
-      const mockPlaces = getMockPlaces(mood);
       setState({
-        places: mockPlaces,
+        places: [],
         loading: false,
-        error: null,
+        error: 'Something went wrong. Please try again.',
       });
     }
   }, []);
