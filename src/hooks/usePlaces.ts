@@ -43,8 +43,8 @@ export const usePlaces = () => {
       }
 
       if (data?.useMock) {
-        const errorMsg = data.error === 'REQUEST_DENIED' 
-          ? 'Google API key is invalid. Please check that your key is valid and has Places API enabled in Google Cloud Console.'
+        const errorMsg = data.error 
+          ? `Geoapify API error: ${data.error}`
           : data.message || 'API key not configured properly.';
         setState({
           places: [],

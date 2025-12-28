@@ -1,8 +1,9 @@
-/// <reference types="@types/google.maps" />
 import { useEffect, useRef, useState } from 'react';
 import { Place, Location } from '@/types/place';
 import { motion } from 'framer-motion';
 import { Map, Loader2 } from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 interface PlacesMapProps {
   places: Place[];
@@ -11,143 +12,132 @@ interface PlacesMapProps {
   onPlaceSelect?: (placeId: string) => void;
 }
 
+// Fix for default marker icons in Leaflet with bundlers
+const defaultIcon = L.icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const userIcon = L.icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const selectedIcon = L.icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
 export const PlacesMap = ({ places, userLocation, selectedPlaceId, onPlaceSelect }: PlacesMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.Marker[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadGoogleMaps = () => {
-      if (window.google?.maps) {
-        initializeMap();
-        return;
-      }
-
-      // Check if script is already loading
-      const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-      if (existingScript) {
-        existingScript.addEventListener('load', initializeMap);
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?libraries=places`;
-      script.async = true;
-      script.defer = true;
-      script.onload = initializeMap;
-      script.onerror = () => {
-        setMapError('Failed to load map');
-        setIsLoading(false);
-      };
-      document.head.appendChild(script);
-    };
-
-    loadGoogleMaps();
-
-    return () => {
-      markersRef.current.forEach(marker => marker.setMap(null));
-      markersRef.current = [];
-    };
-  }, []);
-
-  useEffect(() => {
-    if (mapInstanceRef.current && places.length > 0) {
-      updateMarkers();
-    }
-  }, [places, selectedPlaceId]);
-
-  const initializeMap = () => {
-    if (!mapRef.current || !window.google?.maps) {
-      setMapError('Map initialization failed');
-      setIsLoading(false);
-      return;
-    }
-
-    const center = userLocation 
-      ? { lat: userLocation.lat, lng: userLocation.lng }
-      : places[0]?.location || { lat: 12.93, lng: 80.11 };
+    if (!mapRef.current || mapInstanceRef.current) return;
 
     try {
-      mapInstanceRef.current = new window.google.maps.Map(mapRef.current, {
-        center,
-        zoom: 14,
-        styles: mapStyles,
-        disableDefaultUI: true,
-        zoomControl: true,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-      });
+      const center = userLocation 
+        ? [userLocation.lat, userLocation.lng] as [number, number]
+        : places[0]?.location 
+          ? [places[0].location.lat, places[0].location.lng] as [number, number]
+          : [12.93, 80.11] as [number, number];
+
+      // Initialize map with OpenStreetMap tiles
+      const map = L.map(mapRef.current).setView(center, 14);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19,
+      }).addTo(map);
 
       // Add user location marker
       if (userLocation) {
-        new window.google.maps.Marker({
-          position: userLocation,
-          map: mapInstanceRef.current,
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: '#3B82F6',
-            fillOpacity: 1,
-            strokeColor: '#FFFFFF',
-            strokeWeight: 2,
-          },
-          title: 'Your Location',
-        });
+        L.marker([userLocation.lat, userLocation.lng], { icon: userIcon })
+          .addTo(map)
+          .bindPopup('Your Location');
       }
 
-      updateMarkers();
+      mapInstanceRef.current = map;
       setIsLoading(false);
     } catch (err) {
       console.error('Map init error:', err);
       setMapError('Failed to initialize map');
       setIsLoading(false);
     }
-  };
 
-  const updateMarkers = () => {
-    if (!mapInstanceRef.current || !window.google?.maps) return;
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
+  }, [userLocation]);
+
+  // Update markers when places change
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
 
     // Clear existing markers
-    markersRef.current.forEach(marker => marker.setMap(null));
+    markersRef.current.forEach(marker => marker.remove());
     markersRef.current = [];
 
     if (places.length === 0) return;
 
     // Add place markers
-    const bounds = new window.google.maps.LatLngBounds();
+    const bounds = L.latLngBounds([]);
     
     if (userLocation) {
-      bounds.extend(userLocation);
+      bounds.extend([userLocation.lat, userLocation.lng]);
     }
 
     places.forEach((place, index) => {
-      const isSelected = place.id === selectedPlaceId;
-      
-      const marker = new window.google.maps.Marker({
-        position: place.location,
-        map: mapInstanceRef.current,
-        title: place.name,
-        label: {
-          text: String(index + 1),
-          color: '#FFFFFF',
-          fontSize: '11px',
-          fontWeight: 'bold',
-        },
-      });
+      if (!place.location) return;
 
-      marker.addListener('click', () => {
+      const isSelected = place.id === selectedPlaceId;
+      const marker = L.marker([place.location.lat, place.location.lng], {
+        icon: isSelected ? selectedIcon : defaultIcon
+      })
+        .addTo(map)
+        .bindPopup(`
+          <div style="min-width: 150px;">
+            <strong>${index + 1}. ${place.name}</strong>
+            <br/>
+            <span style="color: #666; font-size: 12px;">${place.address}</span>
+            <br/>
+            <span style="font-size: 12px;">⭐ ${place.rating || 'N/A'} · ${place.distanceText}</span>
+          </div>
+        `);
+
+      marker.on('click', () => {
         onPlaceSelect?.(place.id);
       });
 
       markersRef.current.push(marker);
-      bounds.extend(place.location);
+      bounds.extend([place.location.lat, place.location.lng]);
     });
 
-    mapInstanceRef.current.fitBounds(bounds);
-  };
+    // Fit map to bounds if we have places
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [places, selectedPlaceId, onPlaceSelect, userLocation]);
 
   if (mapError) {
     return (
@@ -184,22 +174,3 @@ export const PlacesMap = ({ places, userLocation, selectedPlaceId, onPlaceSelect
     </motion.div>
   );
 };
-
-// Custom map styles
-const mapStyles: google.maps.MapTypeStyle[] = [
-  {
-    featureType: 'poi',
-    elementType: 'labels',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'transit',
-    elementType: 'labels',
-    stylers: [{ visibility: 'off' }],
-  },
-  {
-    featureType: 'water',
-    elementType: 'geometry',
-    stylers: [{ color: '#e0f2fe' }],
-  },
-];
